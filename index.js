@@ -49,9 +49,42 @@ const client = new MongoClient(uri, {
 });
 async function run() {
   try {
+    const database = client.db("Plantnet");
+    const userCollection = database.collection("users");
+    const plantsCollection = database.collection("plants");
+    //save or update user
+    app.post("/users/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const user = req.body;
+
+      //check if user already exits
+      const isExist = await userCollection.findOne(query);
+      if (isExist) {
+        return res.send(isExist);
+      }
+
+      //if no user already exists insert a user
+      const result = await userCollection.insertOne({
+        ...user,
+        role: "customer",
+        timestamp: Date.now(),
+      });
+      res.send(result);
+    });
+
+    //save a plant
+
+    app.post("/plants", verifyToken, async (req, res) => {
+      const plant = req.body;
+      const result = await plantsCollection.insertOne(plant);
+      res.send(result);
+    });
     // Generate jwt token
     app.post("/jwt", async (req, res) => {
       const email = req.body;
+
+      console.log(email);
       const token = jwt.sign(email, process.env.ACCESS_TOKEN_SECRET, {
         expiresIn: "365d",
       });
