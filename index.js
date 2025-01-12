@@ -80,6 +80,12 @@ async function run() {
       const result = await plantsCollection.insertOne(plant);
       res.send(result);
     });
+
+    //get all plants from db
+    app.get("/plants", async (req, res) => {
+      const result = await plantsCollection.find().toArray();
+      res.send(result);
+    });
     // Generate jwt token
     app.post("/jwt", async (req, res) => {
       const email = req.body;
