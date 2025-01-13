@@ -28,7 +28,6 @@ const verifyToken = async (req, res, next) => {
   }
   jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
     if (err) {
-      console.log(err);
       return res.status(401).send({ message: "unauthorized access" });
     }
     req.user = decoded;
@@ -52,6 +51,7 @@ async function run() {
     const database = client.db("Plantnet");
     const userCollection = database.collection("users");
     const plantsCollection = database.collection("plants");
+    const ordersCollection = database.collection("orders");
     //save or update user
     app.post("/users/:email", async (req, res) => {
       const email = req.params.email;
@@ -86,11 +86,81 @@ async function run() {
       const result = await plantsCollection.find().toArray();
       res.send(result);
     });
+
+    app.get("/plants/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await plantsCollection.findOne(query);
+      res.send(result);
+    });
+
+    //save plant order on db
+    app.post("/orders", verifyToken, async (req, res) => {
+      const orderInfo = req.body;
+
+      const result = await ordersCollection.insertOne(orderInfo);
+      res.send(result);
+    });
+
+    //update plants quantity
+    app.patch("/plants/quantity/:id", verifyToken, async (req, res) => {
+      const id = req.params.id;
+      const { quantityToUpdate } = req.body;
+      const filter = { _id: new ObjectId(id) };
+      let updateDoc = {
+        $inc: { quantity: -quantityToUpdate },
+      };
+      const result = await plantsCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    });
+
+    //get users orders
+    app.get("/customer-orders/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+
+      const query = { "customer.email": email };
+      const result = await ordersCollection
+        .aggregate([
+          {
+            $match: query, //match specific customers data only
+          },
+          {
+            $addFields: {
+              plantId: { $toObjectId: "$plantId" }, //convert their plantId to objectId
+            },
+          },
+          {
+            $lookup: {
+              from: "plants", //go to plants collection
+              localField: "plantId", // and using the plantId
+              foreignField: "_id", // see if their _id matches
+              as: "plants", //return the matching data as plants
+            },
+          },
+          {
+            $unwind: "$plants", //pop the plants object from an array
+          },
+          {
+            $addFields: {
+              name: "$plants.name", //add
+              category: "$plants.category",
+              image: "$plants.image",
+            },
+          },
+          {
+            $project: {
+              plants: 0,
+            },
+          },
+        ])
+        .toArray();
+
+      res.send(result);
+    });
     // Generate jwt token
     app.post("/jwt", async (req, res) => {
       const email = req.body;
 
-      console.log(email);
       const token = jwt.sign(email, process.env.ACCESS_TOKEN_SECRET, {
         expiresIn: "365d",
       });
