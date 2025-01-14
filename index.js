@@ -67,12 +67,19 @@ async function run() {
       //if no user already exists insert a user
       const result = await userCollection.insertOne({
         ...user,
-        role: "customer",
+        role: "Customer",
         timestamp: Date.now(),
       });
       res.send(result);
     });
 
+    //get user role
+    app.get("/users/role/:email", async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const result = await userCollection.findOne(query);
+      res.send({ role: result?.role });
+    });
     //save a plant
 
     app.post("/plants", verifyToken, async (req, res) => {
@@ -173,6 +180,24 @@ async function run() {
         return res.status(409).send("Cannot cancel once product is delivered");
       const result = await ordersCollection.deleteOne(query);
       console.log(result);
+      res.send(result);
+    });
+
+    //manage user status
+    app.patch("/users/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      const query = { email: email };
+      const user = await userCollection.findOne(query);
+      if (!user || user.status === "requested") {
+        return res.status(400).send("You have already requested");
+      }
+
+      const updatedDoc = {
+        $set: {
+          status: "requested",
+        },
+      };
+      const result = await userCollection.updateOne(query, updatedDoc);
       res.send(result);
     });
     // Generate jwt token
