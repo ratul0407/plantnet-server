@@ -88,6 +88,18 @@ async function run() {
       const result = await userCollection.findOne(query);
       res.send({ role: result?.role });
     });
+
+    //change users role
+    app.patch("/user/role/:email", verifyToken, async (req, res) => {
+      const email = req.params.email;
+      const { role } = req.body;
+      const filter = { email: email };
+      const updatedDoc = {
+        $set: { role, status: "Verified" },
+      };
+      const result = await userCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
     //save a plant
 
     app.post("/plants", verifyToken, async (req, res) => {
