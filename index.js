@@ -150,6 +150,54 @@ async function run() {
       res.send({ role: result?.role });
     });
 
+    //get admin stat
+    app.get("/admin-stats", verifyToken, verifyAdmin, async (req, res) => {
+      const totalUsers = await userCollection.estimatedDocumentCount();
+      const totalPlants = await plantsCollection.estimatedDocumentCount();
+      const allOrder = await ordersCollection.find().toArray();
+      // const totalPrice = allOrder.reduce((sum, order) => sum + order.price, 0);
+      //get total revenue, total orders
+
+      //chart data
+      const chartData = await ordersCollection.aggregate([
+        {
+          $group: {
+            _id: {
+              $dateToString: {
+                format: "%y-%m-%d",
+                date: { $toDate: "$_id" },
+              },
+            },
+            quantity: {
+              $sum: "$quantity",
+            },
+            price: {
+              $sum: "$price",
+            },
+            order: {
+              $sum: 1,
+            },
+          },
+        },
+      ]);
+      const orderDetails = await ordersCollection
+        .aggregate([
+          {
+            $group: {
+              _id: null,
+              totalRevenue: { $sum: "$price" },
+              totalOrder: { $sum: 1 },
+            },
+          },
+          {
+            $project: {
+              _id: 0,
+            },
+          },
+        ])
+        .next();
+      res.send({ totalPlants, totalUsers, orderDetails });
+    });
     //change users role
     app.patch(
       "/user/role/:email",
